@@ -8,11 +8,12 @@
 import React, { useState } from 'react';
 import { Alert, Button, FlatList, PermissionsAndroid, SafeAreaView, ScrollView, Text, View } from 'react-native';
 
-import RNBluetoothClassic from 'react-native-bluetooth-classic';
+import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-classic';
 
 const App = () => {
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
   const [bondedDevices, setBondedDevices] = useState([{name: 'This is a test'}]);
+  const [connectedDevice, setConnectedDevice] = useState(null);
 
   // set up callbacks to track bluetooth state
   React.useEffect(() => {
@@ -21,7 +22,16 @@ const App = () => {
       .catch(err => Alert.alert('Could not check Bluetooth status: ' + err));
 
     RNBluetoothClassic.onBluetoothEnabled(() => setBluetoothEnabled(true));
-    RNBluetoothClassic.onBluetoothDisabled(() => setBluetoothEnabled(false));
+    RNBluetoothClassic.onBluetoothDisabled(() => {
+      setConnectedDevice(null);
+      setBluetoothEnabled(false);
+    });
+
+    RNBluetoothClassic.onDeviceDisconnected(event => {
+      if (event.device === connectedDevice) {
+        setConnectedDevice(null);
+      }
+    });
   }, []);
 
   const checkBondedDevices = async () => {
@@ -40,7 +50,33 @@ const App = () => {
     }
   };
 
-  const renderBondedDevice = ({item}) => <Text>{item.name}</Text>;
+  const requestConnect = (device) => async () => {
+    if (connectedDevice !== null) {
+      Alert.alert('Disconnect previous device first.');
+      return;
+    }
+
+    if (!bluetoothEnabled) return;
+
+    try {
+      if (!await device.isConnected()) {
+        if (!await device.connect()) {
+          Alert.alert('Connection failed');
+        }
+      }
+      device.onDataReceived(event => {
+        const bytes = Buffer.from(event.data, 'base64');
+        Alert.alert('data! [' + [...bytes] + ']');
+      });
+      setConnectedDevice(device);
+      await device.write('hello\n');
+    } catch (err) {
+      Alert.alert('Could not connect: ' + err);
+      console.error(err);
+    }
+  };
+
+  const renderBondedDevice = ({item}) => <Text onPress={requestConnect(item)}>{item.name}</Text>;
 
   return (
     <SafeAreaView>

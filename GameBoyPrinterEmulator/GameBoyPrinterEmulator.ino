@@ -25,34 +25,13 @@
  *
  */
 
-// See /WEBUSB.md for details
-#if USB_VERSION == 0x210
-#include <WebUSB.h>
-WebUSB WebUSBSerial(1, "herrzatacke.github.io/gb-printer-web/#/webusb");
-#define Serial WebUSBSerial
-#endif
-
-#define GBP_OUTPUT_RAW_PACKETS true // by default, packets are parsed. if enabled, output will change to raw data packets for parsing and decompressing later
-#define GBP_USE_PARSE_DECOMPRESSOR false // embedded decompressor can be enabled for use with parse mode but it requires fast hardware (SAMD21, SAMD51, ESP8266, ESP32)
-
 #include <stdint.h> // uint8_t
 #include <stddef.h> // size_t
 
 #include "gameboy_printer_protocol.h"
 #include "gbp_serial_io.h"
 
-#if GBP_OUTPUT_RAW_PACKETS
-  #define GBP_FEATURE_PACKET_CAPTURE_MODE
-#else
-  #define GBP_FEATURE_PARSE_PACKET_MODE
-  #if GBP_USE_PARSE_DECOMPRESSOR
-    #define GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-  #endif
-#endif
-
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
 #include "gbp_pkt.h"
-#endif
 
 
 
@@ -91,32 +70,18 @@ WebUSB WebUSBSerial(1, "herrzatacke.github.io/gb-printer-web/#/webusb");
 
 // Dev Note: Gamboy camera sends data payload of 640 bytes usually
 
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
 #define GBP_BUFFER_SIZE 400
-#else
-#define GBP_BUFFER_SIZE 650
-#endif
 
 /* Serial IO */
 // This circular buffer contains a stream of raw packets from the gameboy
 uint8_t gbp_serialIO_raw_buffer[GBP_BUFFER_SIZE] = {0};
 
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
 /* Packet Buffer */
 gbp_pkt_t gbp_pktState = {GBP_REC_NONE, 0};
 uint8_t gbp_pktbuff[GBP_PKT_PAYLOAD_BUFF_SIZE_IN_BYTE] = {0};
 uint8_t gbp_pktbuffSize = 0;
-#ifdef GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-gbp_pkt_tileAcc_t tileBuff = {0};
-#endif
-#endif
 
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-inline void gbp_packet_capture_loop();
-#endif
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
 inline void gbp_parse_packet_loop();
-#endif
 
 /*******************************************************************************
   Utility Functions
@@ -126,12 +91,12 @@ const char *gbpCommand_toStr(int val)
 {
   switch (val)
   {
-    case GBP_COMMAND_INIT    : return "INIT";
-    case GBP_COMMAND_PRINT   : return "PRNT";
-    case GBP_COMMAND_DATA    : return "DATA";
-    case GBP_COMMAND_BREAK   : return "BREK";
-    case GBP_COMMAND_INQUIRY : return "INQY";
-    default: return "?";
+    case GBP_COMMAND_INIT    : return "init";
+    case GBP_COMMAND_PRINT   : return "print";
+    case GBP_COMMAND_DATA    : return "fill";
+    case GBP_COMMAND_BREAK   : return "break";
+    case GBP_COMMAND_INQUIRY : return "status";
+    default: return "unknown";
   }
 }
 
@@ -191,29 +156,18 @@ void setup(void)
 #endif
 
   /* Packet Parser */
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
   gbp_pkt_init(&gbp_pktState);
-#endif
 
 #define VERSION_STRING "V3.2.1 (Copyright (C) 2022 Brian Khuu)"
 
   /* Welcome Message */
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-  Serial.println("// GAMEBOY PRINTER Packet Capture " VERSION_STRING);
-  Serial.println("// Note: Each byte is from each GBP packet is from the gameboy");
-  Serial.println("//       except for the last two bytes which is from the printer");
-  Serial.println("// JS Raw Packet Decoder: https://mofosyne.github.io/arduino-gameboy-printer-emulator/GameBoyPrinterDecoderJS/gameboy_printer_js_raw_decoder.html");
-#endif
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-  Serial.println("// GAMEBOY PRINTER Emulator " VERSION_STRING);
-  Serial.println("// Note: Each hex encoded line is a gameboy tile");
-  Serial.println("// JS Decoder: https://mofosyne.github.io/arduino-gameboy-printer-emulator/GameBoyPrinterDecoderJS/gameboy_printer_js_decoder.html");
-#endif
-  Serial.println("// --- GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007 ---");
-  Serial.println("// This program comes with ABSOLUTELY NO WARRANTY;");
-  Serial.println("// This is free software, and you are welcome to redistribute it");
-  Serial.println("// under certain conditions. Refer to LICENSE file for detail.");
-  Serial.println("// ---");
+  Serial.println(F("Pocket Print Shop by spazzylemons"));
+  Serial.println(F("based on Game Boy Printer Emulator " VERSION_STRING));
+  Serial.println(F("--- GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007 ---"));
+  Serial.println(F("This program comes with ABSOLUTELY NO WARRANTY;"));
+  Serial.println(F("This is free software, and you are welcome to redistribute it"));
+  Serial.println(F("under certain conditions. Refer to LICENSE file for detail."));
+  Serial.println(F("---"));
 
   Serial.flush();
 } // setup()
@@ -222,12 +176,7 @@ void loop()
 {
   static uint16_t sioWaterline = 0;
 
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-  gbp_packet_capture_loop();
-#endif
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
   gbp_parse_packet_loop();
-#endif
 
   // Trigger Timeout and reset the printer if byte stopped being received.
   static uint32_t last_millis = 0;
@@ -247,12 +196,7 @@ void loop()
       Serial.flush();
       digitalWrite(LED_STATUS_PIN, LOW);
 
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
       gbp_pkt_reset(&gbp_pktState);
-#ifdef GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-      tileBuff.count = 0;
-#endif
-#endif
     }
   }
   last_millis = curr_millis;
@@ -279,10 +223,36 @@ void loop()
 
 /******************************************************************************/
 
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
+static const char b64Table[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static void sendBase64(const uint8_t *message, size_t len) {
+  const char *messageEnd = &message[len];
+  uint8_t b, acc;
+  while (message != messageEnd) {
+    b = *message++;
+    Serial.write(b64Table[b >> 2]);
+    acc = (b & 3) << 4;
+    if (message != messageEnd) {
+      b = *message++;
+      Serial.write(b64Table[acc | (b >> 4)]);
+      acc = (b & 0x0f) << 2;
+      if (message != messageEnd) {
+        b = *message++;
+        Serial.write(b64Table[acc | (b >> 6)]);
+        Serial.write(b64Table[b & 0x3f]);
+      } else {
+        Serial.write(b64Table[acc]);
+        Serial.write('=');
+      }
+    } else {
+      Serial.write(b64Table[acc]);
+      Serial.write("==");
+    }
+  }
+}
+
 inline void gbp_parse_packet_loop(void)
 {
-  const char nibbleToCharLUT[] = "0123456789ABCDEF";
   for (int i = 0 ; i < gbp_serial_io_dataBuff_getByteCount() ; i++)
   {
     if (gbp_pkt_processByte(&gbp_pktState, (const uint8_t) gbp_serial_io_dataBuff_getByte(), gbp_pktbuff, &gbp_pktbuffSize, sizeof(gbp_pktbuff)))
@@ -291,55 +261,35 @@ inline void gbp_parse_packet_loop(void)
       {
           digitalWrite(LED_STATUS_PIN, HIGH);
           Serial.print((char)'{');
-          Serial.print("\"command\":\"");
+          Serial.print("\"type\":\"");
           Serial.print(gbpCommand_toStr(gbp_pktState.command));
           Serial.print("\"");
-          if (gbp_pktState.command == GBP_COMMAND_INQUIRY)
-          {
-            // !{"command":"INQY","status":{"lowbatt":0,"jam":0,"err":0,"pkterr":0,"unproc":1,"full":0,"bsy":0,"chk_err":0}}
-            Serial.print(", \"status\":{");
-            Serial.print("\"LowBat\":");
-            Serial.print(gpb_status_bit_getbit_low_battery(gbp_pktState.status)      ? '1' : '0');
-            Serial.print(",\"ER2\":");
-            Serial.print(gpb_status_bit_getbit_other_error(gbp_pktState.status)      ? '1' : '0');
-            Serial.print(",\"ER1\":");
-            Serial.print(gpb_status_bit_getbit_paper_jam(gbp_pktState.status)        ? '1' : '0');
-            Serial.print(",\"ER0\":");
-            Serial.print(gpb_status_bit_getbit_packet_error(gbp_pktState.status)     ? '1' : '0');
-            Serial.print(",\"Untran\":");
+          if (gbp_pktState.command == GBP_COMMAND_INQUIRY) {
+            Serial.print(",\"status\":{");
+            Serial.print(",\"unprocessed\":");
             Serial.print(gpb_status_bit_getbit_unprocessed_data(gbp_pktState.status) ? '1' : '0');
-            Serial.print(",\"Full\":");
+            Serial.print(",\"full\":");
             Serial.print(gpb_status_bit_getbit_print_buffer_full(gbp_pktState.status)? '1' : '0');
-            Serial.print(",\"Busy\":");
+            Serial.print(",\"busy\":");
             Serial.print(gpb_status_bit_getbit_printer_busy(gbp_pktState.status)     ? '1' : '0');
-            Serial.print(",\"Sum\":");
+            Serial.print(",\"checksum\":");
             Serial.print(gpb_status_bit_getbit_checksum_error(gbp_pktState.status)   ? '1' : '0');
             Serial.print((char)'}');
-          }
-          if (gbp_pktState.command == GBP_COMMAND_PRINT)
-          {
-            //!{"command":"PRNT","sheets":1,"margin_upper":1,"margin_lower":3,"pallet":228,"density":64 }
-            Serial.print(", \"sheets\":");
+          } else if (gbp_pktState.command == GBP_COMMAND_PRINT) {
+            Serial.print(",\"sheets\":");
             Serial.print(gbp_pkt_printInstruction_num_of_sheets(gbp_pktbuff));
-            Serial.print(", \"margin_upper\":");
+            Serial.print(",\"marginUpper\":");
             Serial.print(gbp_pkt_printInstruction_num_of_linefeed_before_print(gbp_pktbuff));
-            Serial.print(", \"margin_lower\":");
+            Serial.print(",\"marginLower\":");
             Serial.print(gbp_pkt_printInstruction_num_of_linefeed_after_print(gbp_pktbuff));
-            Serial.print(", \"pallet\":");
+            Serial.print(",\"pallet\":");
             Serial.print(gbp_pkt_printInstruction_palette_value(gbp_pktbuff));
-            Serial.print(", \"density\":");
+            Serial.print(",\"density\":");
             Serial.print(gbp_pkt_printInstruction_print_density(gbp_pktbuff));
-          }
-          if (gbp_pktState.command == GBP_COMMAND_DATA)
-          {
-            //!{"command":"DATA", "compressed":0, "more":0}
-#ifdef GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-            Serial.print(", \"compressed\":0"); // Already decompressed by us, so no need to do so
-#else
-            Serial.print(", \"compressed\":");
+          } else if (gbp_pktState.command == GBP_COMMAND_DATA) {
+            Serial.print(",\"compressed\":");
             Serial.print(gbp_pktState.compression);
-#endif
-            Serial.print(", \"more\":");
+            Serial.print(",\"more\":");
             Serial.print((gbp_pktState.dataLength != 0)?'1':'0');
           }
           Serial.println((char)'}');
@@ -347,106 +297,16 @@ inline void gbp_parse_packet_loop(void)
       }
       else
       {
-#ifdef GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-        // Required for more complex games with compression support
-        while (gbp_pkt_decompressor(&gbp_pktState, gbp_pktbuff, gbp_pktbuffSize, &tileBuff))
-        {
-          if (gbp_pkt_tileAccu_tileReadyCheck(&tileBuff))
-          {
-            // Got Tile
-            for (int i = 0 ; i < GBP_TILE_SIZE_IN_BYTE ; i++)
-            {
-              const uint8_t data_8bit = tileBuff.tile[i];
-              if(i == GBP_TILE_SIZE_IN_BYTE-1) {
-                Serial.print((char)nibbleToCharLUT[(data_8bit>>4)&0xF]);
-                Serial.println((char)nibbleToCharLUT[(data_8bit>>0)&0xF]); // use println on last byte to reduce serial calls
-              } else {
-                Serial.print((char)nibbleToCharLUT[(data_8bit>>4)&0xF]);
-                Serial.print((char)nibbleToCharLUT[(data_8bit>>0)&0xF]);
-                Serial.print((char)' ');
-              }
-            }
-            Serial.flush();
-          }
-        }
-#else
         // Simplified support for gameboy camera only application
         // Dev Note: Good for checking if everything above decompressor is working
         if (gbp_pktbuffSize > 0)
         {
-          // Got Tile
-          for (int i = 0 ; i < gbp_pktbuffSize ; i++)
-          {
-            const uint8_t data_8bit = gbp_pktbuff[i];
-              if(i == gbp_pktbuffSize-1) {
-                Serial.print((char)nibbleToCharLUT[(data_8bit>>4)&0xF]);
-                Serial.println((char)nibbleToCharLUT[(data_8bit>>0)&0xF]); // use println on last byte to reduce serial calls
-              } else {
-                Serial.print((char)nibbleToCharLUT[(data_8bit>>4)&0xF]);
-                Serial.print((char)nibbleToCharLUT[(data_8bit>>0)&0xF]);
-                Serial.print((char)' ');
-              }
-          }
+          Serial.print("{\"type\":\"data\",\"data\":\"");
+          sendBase64(gbp_pktbuff, gbp_pktbuffSize);
+          Serial.println("\"}");
           Serial.flush();
         }
-#endif
       }
     }
   }
 }
-#endif
-
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-inline void gbp_packet_capture_loop()
-{
-  /* tiles received */
-  static uint32_t byteTotal = 0;
-  static uint32_t pktTotalCount = 0;
-  static uint32_t pktByteIndex = 0;
-  static uint16_t pktDataLength = 0;
-  const size_t dataBuffCount = gbp_serial_io_dataBuff_getByteCount();
-  if (
-      ((pktByteIndex != 0)&&(dataBuffCount>0))||
-      ((pktByteIndex == 0)&&(dataBuffCount>=6))
-      )
-  {
-    const char nibbleToCharLUT[] = "0123456789ABCDEF";
-    uint8_t data_8bit = 0;
-    for (int i = 0 ; i < dataBuffCount ; i++)
-    { // Display the data payload encoded in hex
-      // Start of a new packet
-      if (pktByteIndex == 0)
-      {
-        pktDataLength = gbp_serial_io_dataBuff_getByte_Peek(4);
-        pktDataLength |= (gbp_serial_io_dataBuff_getByte_Peek(5)<<8)&0xFF00;
-#if 0
-        Serial.print("// ");
-        Serial.print(pktTotalCount);
-        Serial.print(" : ");
-        Serial.println(gbpCommand_toStr(gbp_serial_io_dataBuff_getByte_Peek(2)));
-#endif
-        digitalWrite(LED_STATUS_PIN, HIGH);
-      }
-      // Print Hex Byte
-      data_8bit = gbp_serial_io_dataBuff_getByte();
-      Serial.print((char)nibbleToCharLUT[(data_8bit>>4)&0xF]);
-      Serial.print((char)nibbleToCharLUT[(data_8bit>>0)&0xF]);
-      // Splitting packets for convenience
-      if ((pktByteIndex>5)&&(pktByteIndex>=(9+pktDataLength)))
-      {
-        digitalWrite(LED_STATUS_PIN, LOW);
-        Serial.println("");
-        pktByteIndex = 0;
-        pktTotalCount++;
-      }
-      else
-      {
-        Serial.print((char)' ');
-        pktByteIndex++; // Byte hex split counter
-        byteTotal++; // Byte total counter
-      }
-    }
-    Serial.flush();
-  }
-}
-#endif

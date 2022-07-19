@@ -121,6 +121,8 @@ function processData(stream) {
   return <Image style={{width: 160, height: 144}} source={{uri: source}} />;
 }
 
+let connectionInProgress = false;
+
 const App = () => {
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
   const [bondedDevices, setBondedDevices] = useState([{name: 'This is a test'}]);
@@ -163,6 +165,8 @@ const App = () => {
   };
 
   const requestConnect = (device) => async () => {
+    if (connectionInProgress) return;
+
     if (connectedDevice !== null) {
       Alert.alert('Disconnect previous device first.');
       return;
@@ -171,6 +175,8 @@ const App = () => {
     if (!bluetoothEnabled) return;
 
     try {
+      connectionInProgress = true;
+
       if (!await device.isConnected()) {
         if (!await device.connect()) {
           Alert.alert('Connection failed');
@@ -192,6 +198,8 @@ const App = () => {
     } catch (err) {
       Alert.alert('Could not connect: ' + err);
       console.error(err);
+    } finally {
+      connectionInProgress = false;
     }
   };
 

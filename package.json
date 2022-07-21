@@ -1,5 +1,5 @@
 {
-  "name": "PocketPrintShop",
+  "name": "pocket-print-shop",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -11,15 +11,14 @@
   },
   "dependencies": {
     "buffer": "^6.0.3",
-    "crc-32": "^1.2.2",
     "react": "18.0.0",
-    "react-native": "0.69.1",
-    "react-zlib-js": "^1.0.5"
+    "react-native": "0.69.1"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
     "@babel/runtime": "^7.12.5",
     "@react-native-community/eslint-config": "^2.0.0",
+    "@types/react-native": "^0.69.3",
     "babel-jest": "^26.6.3",
     "eslint": "^7.32.0",
     "jest": "^26.6.3",

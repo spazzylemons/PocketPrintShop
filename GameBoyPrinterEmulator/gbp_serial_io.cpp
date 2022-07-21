@@ -43,7 +43,7 @@
 //#define TEST_PRETEND_BUFFER_FULL
 
 // Feature
-//#define FEATURE_CHECKSUM_SUPPORTED ///< WIP
+#define FEATURE_CHECKSUM_SUPPORTED ///< WIP
 
 #define GBP_BUSY_PACKET_COUNT 20 // 68 Inquiry packets is generally approximately how long it takes for a real printer to print. This is not a real printer so can be shorter
 
@@ -279,7 +279,7 @@ bool gpb_serial_io_reset(void)
 
 #ifdef FEATURE_CHECKSUM_SUPPORTED
   // Reset temp Buffer
-  gpb_cbuff_ResetTemp(&gpb_pktIO.dataBuffer);
+//  gpb_cbuff_ResetTemp(&gpb_pktIO.dataBuffer);
 #endif // FEATURE_CHECKSUM_SUPPORTED
 
   return true;
@@ -677,19 +677,19 @@ bool gpb_serial_io_OnChange_ISR(const bool GBP_SCLK, const bool GBP_SOUT)
           break;
       }
 
-#ifdef FEATURE_CHECKSUM_SUPPORTED
-      // temp buff handling
-      if (gpb_status_bit_getbit_checksum_error(gpb_pktIO.statusBuffer))
-      {
-        // On checksum error, throw away old data. GBP will resend
-        gpb_cbuff_ResetTemp(&gpb_pktIO.dataBuffer);
-      }
-      else
-      {
-        // Checksum ok, keep the new data
-        gpb_cbuff_AcceptTemp(&gpb_pktIO.dataBuffer);
-      }
-#endif // FEATURE_CHECKSUM_SUPPORTED
+//#ifdef FEATURE_CHECKSUM_SUPPORTED
+//      // temp buff handling
+//      if (gpb_status_bit_getbit_checksum_error(gpb_pktIO.statusBuffer))
+//      {
+//        // On checksum error, throw away old data. GBP will resend
+//        gpb_cbuff_ResetTemp(&gpb_pktIO.dataBuffer);
+//      }
+//      else
+//      {
+//        // Checksum ok, keep the new data
+//        gpb_cbuff_AcceptTemp(&gpb_pktIO.dataBuffer);
+//      }
+//#endif // FEATURE_CHECKSUM_SUPPORTED
 
       // Cleanup
       gpb_pktIO.packetState = GBP_PKT10_PARSE_HEADER_COMMAND_AND_COMPRESSION;

@@ -6,13 +6,67 @@
  */
 
 import React, { useState } from 'react';
-import { Alert, Button, FlatList, Image, PermissionsAndroid, SafeAreaView, Text, View } from 'react-native';
 
-import RNBluetoothClassic from 'react-native-bluetooth-classic';
+import { Buffer } from 'buffer';
+
+import {
+  Alert,
+  FlatList,
+  Image,
+  NativeEventEmitter,
+  NativeModules,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { deflateSync } from 'react-zlib-js';
 
 import CRC32 from 'crc-32';
+
+const { UsbSerialModule } = NativeModules;
+
+const styles = StyleSheet.create({
+  main: {
+    backgroundColor: 'white',
+    color: 'black',
+    flex: 1,
+  },
+
+  title: {
+    padding: 10,
+    fontSize: 24,
+    backgroundColor: 'black',
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+
+  availableDevice: {
+    color: 'black',
+    fontSize: 24,
+    padding: 5,
+    textAlign: 'center',
+  },
+
+  connectedDevice: {
+    color: 'white',
+    backgroundColor: 'black',
+  },
+
+  sectionHeader: {
+    color: 'black',
+    textAlign: 'center',
+  },
+
+  pictureFrame: {
+    backgroundColor: 'red',
+    padding: 10,
+    margin: 10,
+    alignSelf: 'center',
+  },
+});
 
 function intToBytes(int) {
   return [
@@ -36,8 +90,14 @@ function processData(stream) {
 
   let i = 0;
   while (i < stream.length) {
-    // ignore magic
-    i += 2;
+    // get magic
+    const magicLo = stream[i++];
+    const magicHi = stream[i++];
+    const magic = magicLo | (magicHi << 8);
+    if (magic != 0x3388) {
+      console.error('magic data missing');
+      return null;
+    }
     // get command
     const command = stream[i++];
     // get compression
@@ -49,10 +109,25 @@ function processData(stream) {
     // get payload
     const payload = stream.slice(i, i + size);
     i += size;
-    // ignore checksum and ack
-    i += 3;
+    // get checksum
+    const sumLo = stream[i++];
+    const sumHi = stream[i++];
+    const sum = sumLo | (sumHi << 8);
+    const compare = command + compression + sizeLo + sizeHi;
+    for (let k = 0; k < size; k++) {
+      compare = (compare + payload[k]) & 0xffff;
+    }
+    // ignore ack
+    i += 1;
     // get status
     const status = stream[i++];
+    if (compare != sum) {
+      console.error('checksum incorrect, ignoring packet');
+      if ((status & 1) == 0) {
+        console.error('emulator disagrees about checksum error');
+      }
+      continue;
+    }
     // process packet
     switch (command) {
       case 1:
@@ -118,107 +193,115 @@ function processData(stream) {
   pngData = pngData.concat(createPngChunk('IEND', []));
   const source = 'data:image/png;base64,' + Buffer.from(pngData).toString('base64');
 
-  return <Image style={{width: 160, height: 144}} source={{uri: source}} />;
+  return <Image style={{ width: 160, height }} source={{uri: source}} />;
 }
 
 let connectionInProgress = false;
+let readListener = null;
+
+const eventEmitter = new NativeEventEmitter(UsbSerialModule);
 
 const App = () => {
-  const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
-  const [bondedDevices, setBondedDevices] = useState([{name: 'This is a test'}]);
+  // TODO is there some way to handle unexpected disconnect of the device?
+  const [devices, setDevices] = useState([]);
   const [connectedDevice, setConnectedDevice] = useState(null);
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState([]);
 
-  // set up callbacks to track bluetooth state
   React.useEffect(() => {
-    RNBluetoothClassic.isBluetoothEnabled()
-      .then(setBluetoothEnabled)
-      .catch(err => Alert.alert('Could not check Bluetooth status: ' + err));
-
-    RNBluetoothClassic.onBluetoothEnabled(() => setBluetoothEnabled(true));
-    RNBluetoothClassic.onBluetoothDisabled(() => {
+    // listen for disconnect
+    eventEmitter.addListener('usbSerialDisconnect', () => {
       setConnectedDevice(null);
-      setBluetoothEnabled(false);
-    });
-
-    RNBluetoothClassic.onDeviceDisconnected(event => {
-      if (event.device === connectedDevice) {
-        setConnectedDevice(null);
+      if (readListener !== null) {
+        readListener.remove();
+        readListener = null;
       }
     });
+    // repeatedly read the devices list
+    (async function checkDevices() {
+      try {
+        setDevices(await UsbSerialModule.listDevices());
+      } catch (err) {
+        console.error(err);
+      }
+      setTimeout(checkDevices, 1000);
+    })();
   }, []);
-
-  const checkBondedDevices = async () => {
-    // don't check devices if bluetooth is off
-    if (!bluetoothEnabled) return;
-    try {
-      // TODO iOS support
-      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        return;
-      }
-      setBondedDevices(await RNBluetoothClassic.getBondedDevices());
-    } catch (err) {
-      Alert.alert('Could not get bonded devices: ' + err);
-      console.error(err);
-    }
-  };
 
   const requestConnect = (device) => async () => {
     if (connectionInProgress) return;
+
+    // if we're connected to this very device, we'll do a disconnect instead
+    if (connectedDevice === device) {
+      try {
+        UsbSerialModule.disconnect();
+      } catch (err) {
+        console.log(err);
+      }
+      return;
+    }
 
     if (connectedDevice !== null) {
       Alert.alert('Disconnect previous device first.');
       return;
     }
 
-    if (!bluetoothEnabled) return;
-
     try {
       connectionInProgress = true;
 
-      if (!await device.isConnected()) {
-        if (!await device.connect()) {
-          Alert.alert('Connection failed');
-        }
-      }
-      let printerData = [];
-      device.onDataReceived(({ data }) => {
-        for (let i = 0; i < data.length; i += 2) {
-          if (data[i] == '!') {
-            setImage(processData(printerData));
-            printerData = [];
-          } else {
-            printerData.push(parseInt(data.substring(i, i + 2), 16));
-          }
-        }
-      });
+      await UsbSerialModule.connect(device);
       setConnectedDevice(device);
-      Alert.alert('i am connected');
     } catch (err) {
-      Alert.alert('Could not connect: ' + err);
-      console.error(err);
+      if (err !== 'permission denied') {
+        Alert.alert('Could not connect: ' + err);
+      }
+      return;
     } finally {
       connectionInProgress = false;
     }
+
+    let timeout = null;
+    let printerData = [];
+    readListener = eventEmitter.addListener('usbSerialRead', ({data}) => {
+      printerData = printerData.concat(Buffer.from(data, 'base64').toJSON().data);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        timeout = null;
+        const image = processData(printerData);
+        if (image) {
+          images.push(image);
+          setImages(images);
+        }
+        printerData = [];
+      }, 1000);
+    });
   };
 
-  const renderBondedDevice = ({item}) => <Text style={{fontSize: 30}} onPress={requestConnect(item)}>{item.name}</Text>;
+  const renderDevice = ({item}) => {
+    const deviceStyles = [styles.availableDevice];
+    if (item === connectedDevice) {
+      deviceStyles.push(styles.connectedDevice);
+    }
+    return <Text style={deviceStyles} onPress={requestConnect(item)}>deviceId = {item}</Text>;
+  };
+
+  const renderImage = ({item}) => {
+    return <View style={styles.pictureFrame}>
+      {item}
+    </View>
+  };
 
   return (
-    <SafeAreaView>
-      <Text>Pocket Print Shop</Text>
-      <View>
-        <Text>Bluetooth enabled? {bluetoothEnabled ? <Text>Yep</Text> : <Text>Nope</Text>}</Text>
-        <Button
-          title='Check paired devices'
-          onPress={checkBondedDevices}
-        />
-      </View>
-      {image !== null ? image : <View><Text>no image???</Text></View>}
+    <SafeAreaView style={styles.main}>
+      <Text style={styles.title}>Pocket Print Shop</Text>
+      <Text style={styles.sectionHeader}>Available devices</Text>
       <FlatList
-        data={bondedDevices}
-        renderItem={renderBondedDevice}
+        data={devices}
+        renderItem={renderDevice}
+      />
+      <Text style={styles.sectionHeader}>Temporary gallery</Text>
+      <FlatList
+        data={images}
+        renderItem={renderImage}
       />
     </SafeAreaView>
   );

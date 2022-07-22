@@ -1,5 +1,7 @@
 import React from 'react';
-import { Image } from 'react-native';
+import { Image, ToastAndroid } from 'react-native';
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 import UsbSerial from './UsbSerial';
 import PngEncoder from './PngEncoder';
 
@@ -32,6 +34,19 @@ export class PrinterImage {
 
     public render() {
         return <Image source={{ uri: this.uri }} style={{ width: IMAGE_WIDTH, height: this.height }} />;
+    }
+
+    public download() {
+        const path = RNFS.DownloadDirectoryPath + '/' + this.filename;
+        RNFS.writeFile(path, this.data, 'base64')
+            .then(() => ToastAndroid.show('Image downladed.', ToastAndroid.SHORT))
+            .catch(err => console.error(err));
+    }
+
+    public share() {
+        Share.open({ filename: this.filename, type: 'image/png', url: this.uri })
+            .then(() => {})
+            .catch(err => console.error(err));
     }
 }
 

@@ -30,6 +30,10 @@ namespace UsbSerial {
             callback(Buffer.from(data, 'base64'));
         });
     }
+
+    export function getDeviceName(device: UsbSerial.Device) {
+        return device.name ?? `[id ${device.id}]`;
+    }
 }
 
 export default UsbSerial;

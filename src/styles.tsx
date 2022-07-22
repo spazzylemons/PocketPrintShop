@@ -1,43 +1,85 @@
 import { StyleSheet } from 'react-native';
+import { DefaultTheme } from '@react-navigation/native';
+
+const colors = {
+    darker: '#222',
+    dark: '#444',
+    light: '#ccc',
+    lighter: '#fff',
+};
 
 const styles = StyleSheet.create({
     main: {
-        backgroundColor: 'white',
-        color: 'black',
+        backgroundColor: colors.darker,
+        color: colors.lighter,
         flex: 1,
     },
 
-    title: {
-        padding: 10,
-        fontSize: 24,
-        backgroundColor: 'black',
-        color: 'white',
-        textAlign: 'center',
-        fontWeight: 'bold',
-    },
-
     availableDevice: {
-        color: 'black',
+        backgroundColor: colors.dark,
+        color: colors.light,
         fontSize: 24,
-        padding: 5,
+        padding: 8,
         textAlign: 'center',
     },
 
     connectedDevice: {
-        color: 'white',
-        backgroundColor: 'black',
+        backgroundColor: colors.light,
+        color: colors.dark,
     },
 
-    sectionHeader: {
-        color: 'black',
+    textLine: {
+        color: colors.lighter,
+        fontSize: 16,
+        padding: 24,
         textAlign: 'center',
     },
 
     pictureFrame: {
-        padding: 10,
-        margin: 10,
+        backgroundColor: colors.lighter,
+
+        padding: 16,
+        margin: 16,
         alignSelf: 'center',
+
+        elevation: 3,
+    },
+
+    button: {
+        backgroundColor: colors.light,
+
+        alignSelf: 'center',
+        borderRadius: 8,
+
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+
+        elevation: 3,
+
+        margin: 8,
+    },
+
+    buttonText: {
+        color: colors.darker,
+        fontSize: 16,
+    },
+
+    license: {
+        color: colors.lighter,
+        fontFamily: 'monospace',
+        fontSize: 8,
     },
 });
 
 export default styles;
+
+export const NavigatorTheme = {
+    dark: true,
+    colors: {
+        ...DefaultTheme.colors,
+        primary: colors.dark,
+        background: colors.darker,
+        card: colors.dark,
+        text: colors.lighter,
+    }
+};

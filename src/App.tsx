@@ -8,7 +8,7 @@ import type { ListRenderItemInfo } from 'react-native';
 let connectionInProgress = false;
 
 const App = () => {
-    const [devices, setDevices] = useState<number[]>([]);
+    const [devices, setDevices] = useState<UsbSerial.Device[]>([]);
     const [connectedDevice, setConnectedDevice] = useState<number | null>(null);
     const [images, setImages] = useState<PrinterImage[]>([]);
 
@@ -68,13 +68,15 @@ const App = () => {
         };
     }
 
-    function renderDevice(info: ListRenderItemInfo<number>): React.ReactElement {
+    function renderDevice(info: ListRenderItemInfo<UsbSerial.Device>): React.ReactElement {
         const device = info.item;
         const deviceStyles: object[] = [styles.availableDevice];
-        if (device === connectedDevice) {
+        if (device.id === connectedDevice) {
             deviceStyles.push(styles.connectedDevice);
         }
-        return <Text style={deviceStyles} onPress={requestConnect(device)}>deviceId = {device}</Text>;
+        return <View>
+            <Text style={deviceStyles} onPress={requestConnect(device.id)}>{device.name ?? `<id ${device.id}>`}</Text>
+        </View>;
     }
 
     function renderImage(info: ListRenderItemInfo<PrinterImage>): React.ReactElement {

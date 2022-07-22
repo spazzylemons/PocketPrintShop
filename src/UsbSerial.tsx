@@ -7,12 +7,14 @@ const { UsbSerialModule } = NativeModules;
 const eventEmitter = new NativeEventEmitter(UsbSerialModule);
 
 namespace UsbSerial {
-    export function listDevices(): Promise<number[]> {
+    export type Device = { id: number, name: string | null };
+
+    export function listDevices(): Promise<Device[]> {
         return UsbSerialModule.listDevices();
     }
 
-    export function connect(device: number): Promise<null> {
-        return UsbSerialModule.connect(device);
+    export function connect(deviceId: number): Promise<null> {
+        return UsbSerialModule.connect(deviceId);
     }
 
     export function disconnect(): void {

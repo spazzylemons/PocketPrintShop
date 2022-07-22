@@ -122,7 +122,11 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
         try {
             WritableArray result = Arguments.createArray();
             for (UsbSerialDriver driver : findDrivers()) {
-                result.pushInt(driver.getDevice().getDeviceId());
+                WritableMap map = Arguments.createMap();
+                UsbDevice device = driver.getDevice();
+                map.putInt("id", device.getDeviceId());
+                map.putString("name", device.getProductName());
+                result.pushMap(map);
             }
             promise.resolve(result);
         } catch (Exception e) {

@@ -1,10 +1,38 @@
+import React from 'react';
+import { Image } from 'react-native';
 import UsbSerial from './UsbSerial';
 import PngEncoder from './PngEncoder';
 
-export type PrinterImage = {
-    png: string,
-    width: number,
-    height: number,
+const IMAGE_WIDTH = 160;
+
+export class PrinterImage {
+    public readonly data: string;
+    public readonly filename: string;
+    private readonly height: number;
+
+    public constructor(data: string, height: number) {
+        const time = new Date();
+
+        const yyyy = time.getFullYear().toString().padStart(4, '0');
+        const mm = (time.getMonth() + 1).toString().padStart(2, '0');
+        const dd = time.getDay().toString().padStart(2, '0');
+
+        const HH = time.getHours().toString().padStart(2, '0');
+        const MM = time.getMinutes().toString().padStart(2, '0');
+        const SS = time.getSeconds().toString().padStart(2, '0');
+
+        this.data = data;
+        this.filename = `printed-${yyyy + mm + dd}-${HH + MM + SS}.png`;
+        this.height = height;
+    }
+
+    get uri() {
+        return 'data:image/png;base64,' + this.data;
+    }
+
+    public render() {
+        return <Image source={{ uri: this.uri }} style={{ width: IMAGE_WIDTH, height: this.height }} />;
+    }
 }
 
 enum Command {
@@ -85,8 +113,6 @@ class AsyncStream {
 }
 
 async function processData(stream: AsyncStream): Promise<PrinterImage> {
-    // width of a print is always 160
-    const width = 160;
     // height depends on the amount of data provided
     let height = 0;
     // the vram collects data from the game
@@ -162,20 +188,20 @@ async function processData(stream: AsyncStream): Promise<PrinterImage> {
     }
 
     // convert to bitmap
-    const pixels = new Uint32Array(new ArrayBuffer(width * height * 4));
+    const pixels = new Uint32Array(new ArrayBuffer(IMAGE_WIDTH * height * 4));
     let y = 0;
     for (const { payload, tiles } of imageParts) {
         const palette = payload[2];
         let i = 0;
         while (i < tiles.length) {
-            for (let x = 0; x < width; x += 8) {
+            for (let x = 0; x < IMAGE_WIDTH; x += 8) {
                 for (let py = 0; py < 8; py++) {
                     let lo = tiles[i++];
                     let hi = tiles[i++];
                     for (let px = 0; px < 8; px++) {
                         const paletteIndex = (lo >> 7) | ((hi >> 6) & 2);
                         const paletteColor = 3 - ((palette >> (paletteIndex << 1)) & 3);
-                        pixels[width * (y + py) + x + px] = DEFAULT_PALETTE[paletteColor];
+                        pixels[IMAGE_WIDTH * (y + py) + x + px] = DEFAULT_PALETTE[paletteColor];
                         lo = (lo << 1) & 0xff;
                         hi = (hi << 1) & 0xff;
                     }
@@ -185,8 +211,8 @@ async function processData(stream: AsyncStream): Promise<PrinterImage> {
         }
     }
     // encode to PNG
-    const png = await PngEncoder.encode(pixels, width, height);
-    return { png, width, height };
+    const data = await PngEncoder.encode(pixels, IMAGE_WIDTH, height);
+    return new PrinterImage(data, height);
 }
 
 class PacketProcessor {

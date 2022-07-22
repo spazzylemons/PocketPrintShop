@@ -1,4 +1,22 @@
-package com.pocketprintshop.newarchitecture;
+/**
+ * Pocket Print Shop - Print portable game pictures from your phone
+ * Copyright (C) 2022 spazzylemons
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package me.spazzylemons.pocketprintshop.newarchitecture;
 
 import android.app.Application;
 import androidx.annotation.NonNull;
@@ -19,9 +37,10 @@ import com.facebook.react.fabric.CoreComponentsRegistry;
 import com.facebook.react.fabric.FabricJSIModuleProvider;
 import com.facebook.react.fabric.ReactNativeConfig;
 import com.facebook.react.uimanager.ViewManagerRegistry;
-import com.pocketprintshop.BuildConfig;
-import com.pocketprintshop.newarchitecture.components.MainComponentsRegistry;
-import com.pocketprintshop.newarchitecture.modules.MainApplicationTurboModuleManagerDelegate;
+import me.spazzylemons.pocketprintshop.BuildConfig;
+import me.spazzylemons.pocketprintshop.newarchitecture.components.MainComponentsRegistry;
+import me.spazzylemons.pocketprintshop.newarchitecture.modules.MainApplicationTurboModuleManagerDelegate;
+
 import java.util.ArrayList;
 import java.util.List;
 

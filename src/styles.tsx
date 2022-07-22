@@ -34,7 +34,6 @@ const styles = StyleSheet.create({
     },
 
     pictureFrame: {
-        backgroundColor: 'red',
         padding: 10,
         margin: 10,
         alignSelf: 'center',

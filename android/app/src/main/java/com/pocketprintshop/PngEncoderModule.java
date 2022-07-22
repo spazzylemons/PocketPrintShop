@@ -28,15 +28,14 @@ public class PngEncoderModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void encode(String pixelString, int width, int height, Promise promise) {
-        Log.d("ENCODE", "GOT HERE 0");
         try {
             // decode the input into bytes
             byte[] pixelBytes = Base64.decode(pixelString, 0);
             // pack bytes big-endian
-            IntBuffer buffer = ByteBuffer.wrap(pixelBytes).order(ByteOrder.BIG_ENDIAN).asIntBuffer();
+            IntBuffer buffer = ByteBuffer.wrap(pixelBytes).order(ByteOrder.nativeOrder()).asIntBuffer();
             int[] pixels = new int[buffer.capacity()];;
             buffer.get(pixels);
-            // create RGBA image
+            // create ARGB image
             Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
             // compress to PNG
             ByteArrayOutputStream out = new ByteArrayOutputStream();

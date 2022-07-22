@@ -1,9 +1,7 @@
 package com.pocketprintshop;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
@@ -15,7 +13,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.facebook.react.bridge.Arguments;
-import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -33,6 +30,7 @@ import java.util.List;
 
 public class UsbSerialModule extends ReactContextBaseJavaModule implements SerialInputOutputManager.Listener {
     private static final String INTENT = BuildConfig.APPLICATION_ID + ".GRANT_USB";
+
     private static final String DISCONNECT_EVENT = "usbSerialDisconnect";
     private static final String READ_EVENT = "usbSerialRead";
 
@@ -48,12 +46,16 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
         return "UsbSerialModule";
     }
 
-    private UsbManager getManager() {
+    private @NonNull Activity getActivity() {
         Activity activity = getCurrentActivity();
         if (activity == null) {
             throw new IllegalStateException("no current activity");
         }
-        return (UsbManager) activity.getSystemService(Context.USB_SERVICE);
+        return activity;
+    }
+
+    private UsbManager getManager() {
+        return (UsbManager) getActivity().getSystemService(Context.USB_SERVICE);
     }
 
     private List<UsbSerialDriver> findDrivers() {
@@ -95,6 +97,26 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
         }
     }
 
+    private void doConnect(UsbDeviceConnection connection, UsbSerialDriver driver) throws IOException {
+        UsbSerialPort port = driver.getPorts().get(0);
+        try {
+            port.open(connection);
+            port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
+            synchronized (this) {
+                if (currentPort != null) {
+                    port.close();
+                    throw new IllegalStateException("already connected");
+                }
+                currentPort = port;
+                port = null;
+                ioManager = new SerialInputOutputManager(currentPort, this);
+                ioManager.start();
+            }
+        } catch (Exception e) {
+            if (port != null) port.close();
+        }
+    }
+
     @ReactMethod
     public void listDevices(Promise promise) {
         try {
@@ -116,37 +138,33 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
                 throw new IllegalArgumentException("device does not exist");
             }
             UsbDevice device = driver.getDevice();
-            UsbDeviceConnection conn = getManager().openDevice(device);
-            if (conn == null) {
-                UsbManager manager = getManager();
-                if (!manager.hasPermission(device)) {
-                    // request permission so we'll hopefully have it later
-                    PendingIntent intent;
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        intent = PendingIntent.getBroadcast(getCurrentActivity(), 0, new Intent(INTENT), PendingIntent.FLAG_IMMUTABLE);
-                    } else {
-                        intent = PendingIntent.getBroadcast(getCurrentActivity(), 0, new Intent(INTENT), 0);
-                    }
-                    manager.requestPermission(device, intent);
-                    throw new RuntimeException("permission denied");
+            UsbDeviceConnection connection = getManager().openDevice(device);
+            // if the connection was successful, use it
+            if (connection != null) {
+                try {
+                    doConnect(connection, driver);
+                } catch (Exception e) {
+                    connection.close();
+                    throw e;
                 }
-                throw new RuntimeException("connection failed");
-            }
-            UsbSerialPort port = driver.getPorts().get(0);
-            port.open(conn);
-            port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
-            synchronized (this) {
-                if (currentPort != null) {
-                    port.close();
-                    throw new IllegalStateException("already connected");
-                }
-                currentPort = port;
-                ioManager = new SerialInputOutputManager(port, this);
-                ioManager.start();
                 promise.resolve(null);
+                return;
             }
+            if (getManager().hasPermission(device)) {
+                // if we had permission, then we don't know why it failed
+                throw new IOException("connection failed");
+            }
+            // ask for permission and fail
+            PendingIntent pendingIntent;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                pendingIntent = PendingIntent.getBroadcast(getCurrentActivity(), 0, new Intent(INTENT), PendingIntent.FLAG_IMMUTABLE);
+            } else {
+                pendingIntent = PendingIntent.getBroadcast(getCurrentActivity(), 0, new Intent(INTENT), 0);
+            }
+            getManager().requestPermission(device, pendingIntent);
+            throw new RuntimeException("permission denied");
         } catch (Exception e) {
-            promise.reject("failed to connect", e);
+            promise.reject(e);
         }
     }
 

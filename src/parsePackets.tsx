@@ -57,7 +57,7 @@ export class PrinterImage {
     public download() {
         const path = RNFS.DownloadDirectoryPath + '/' + this.filename + '.png';
         RNFS.writeFile(path, this.data, 'base64')
-            .then(() => ToastAndroid.show('Image downladed.', ToastAndroid.SHORT))
+            .then(() => ToastAndroid.show('Image downloaded.', ToastAndroid.SHORT))
             .catch(err => console.error(err));
     }
 

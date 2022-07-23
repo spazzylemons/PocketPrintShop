@@ -42,7 +42,7 @@ export class PrinterImage {
         const SS = time.getSeconds().toString().padStart(2, '0');
 
         this.data = data;
-        this.filename = `printed-${yyyy + mm + dd}-${HH + MM + SS}.png`;
+        this.filename = `printed-${yyyy + mm + dd}-${HH + MM + SS}`;
         this.height = height;
     }
 
@@ -55,7 +55,7 @@ export class PrinterImage {
     }
 
     public download() {
-        const path = RNFS.DownloadDirectoryPath + '/' + this.filename;
+        const path = RNFS.DownloadDirectoryPath + '/' + this.filename + '.png';
         RNFS.writeFile(path, this.data, 'base64')
             .then(() => ToastAndroid.show('Image downladed.', ToastAndroid.SHORT))
             .catch(err => console.error(err));

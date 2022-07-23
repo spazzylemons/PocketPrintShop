@@ -1,4 +1,4 @@
-/**
+/*
  * Pocket Print Shop - Print portable game pictures from your phone
  * Copyright (C) 2022 spazzylemons
  *
@@ -18,6 +18,8 @@
 
 package me.spazzylemons.pocketprintshop;
 
+import androidx.annotation.NonNull;
+
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -27,15 +29,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * The package for {@link UsbSerialModule}.
+ */
 public class UsbSerialPackage implements ReactPackage {
 
     @Override
-    public List<ViewManager> createViewManagers(ReactApplicationContext context) {
+    @SuppressWarnings("rawtypes")
+    public @NonNull List<ViewManager> createViewManagers(@NonNull ReactApplicationContext context) {
         return Collections.emptyList();
     }
 
     @Override
-    public List<NativeModule> createNativeModules(ReactApplicationContext context) {
+    public @NonNull List<NativeModule> createNativeModules(@NonNull ReactApplicationContext context) {
         List<NativeModule> modules = new ArrayList<>();
         modules.add(new UsbSerialModule(context));
         return modules;

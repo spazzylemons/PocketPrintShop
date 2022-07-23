@@ -1,4 +1,4 @@
-/**
+/*
  * Pocket Print Shop - Print portable game pictures from your phone
  * Copyright (C) 2022 spazzylemons
  *
@@ -20,7 +20,6 @@ package me.spazzylemons.pocketprintshop;
 
 import android.graphics.Bitmap;
 import android.util.Base64;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -34,8 +33,15 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
+/**
+ * A module that exposes the native function for encoding PNG images.
+ */
 public class PngEncoderModule extends ReactContextBaseJavaModule {
-    PngEncoderModule(ReactApplicationContext reactContext) {
+    /**
+     * Create a new PngEncoderModule.
+     * @param reactContext The context to connect this module to.
+     */
+    PngEncoderModule(@NonNull ReactApplicationContext reactContext) {
         super(reactContext);
     }
 
@@ -44,14 +50,21 @@ public class PngEncoderModule extends ReactContextBaseJavaModule {
         return "PngEncoderModule";
     }
 
+    /**
+     * Encode a pixel bitmap as a PNG image.
+     * @param pixelString Native-endian ARGB pixels, encoded in Base64.
+     * @param width       The width of the image in pixels.
+     * @param height      The height of the image in pixels.
+     * @param promise     Resolves with the PNG data encoded in Base64, or rejects on failure.
+     */
     @ReactMethod
-    public void encode(String pixelString, int width, int height, Promise promise) {
+    public void encode(@NonNull String pixelString, int width, int height, @NonNull Promise promise) {
         try {
             // decode the input into bytes
             byte[] pixelBytes = Base64.decode(pixelString, 0);
-            // pack bytes big-endian
+            // pack bytes using native endian
             IntBuffer buffer = ByteBuffer.wrap(pixelBytes).order(ByteOrder.nativeOrder()).asIntBuffer();
-            int[] pixels = new int[buffer.capacity()];;
+            int[] pixels = new int[buffer.capacity()];
             buffer.get(pixels);
             // create ARGB image
             Bitmap bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
@@ -61,7 +74,7 @@ public class PngEncoderModule extends ReactContextBaseJavaModule {
             // send PNG to javascript
             promise.resolve(Base64.encodeToString(out.toByteArray(), 0));
         } catch (Exception e) {
-            promise.reject("failed to encode image", e);
+            promise.reject(e);
         }
     }
 }

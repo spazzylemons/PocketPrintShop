@@ -22,6 +22,7 @@ import android.graphics.Bitmap;
 import android.util.Base64;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -41,7 +42,7 @@ public class PngEncoderModule extends ReactContextBaseJavaModule {
      * Create a new PngEncoderModule.
      * @param reactContext The context to connect this module to.
      */
-    PngEncoderModule(@NonNull ReactApplicationContext reactContext) {
+    PngEncoderModule(@Nullable ReactApplicationContext reactContext) {
         super(reactContext);
     }
 

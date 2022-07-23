@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ToastAndroid } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -33,8 +33,6 @@ import PhotoScreen from './screens/PhotoScreen';
 
 const Stack = createNativeStackNavigator();
 
-let addImage = (image: PrinterImage) => {};
-
 const App = () => {
     const [devices, setDevices] = useState<UsbSerial.Device[]>([]);
     const deviceList = { devices, setDevices };
@@ -45,13 +43,14 @@ const App = () => {
     const [images, setImages] = useState<PrinterImage[]>([]);
     const gallery = { images, setImages };
 
-    addImage = image => {
+    const addImage = useRef((image: PrinterImage) => {});
+    addImage.current = image => {
         setImages(images.concat([image]));
     };
 
     useEffect(() => {
         const endData = parsePackets(image => {
-            addImage(image);
+            addImage.current(image);
         });
 
         UsbSerial.onDisconnect(() => {
@@ -92,7 +91,7 @@ const App = () => {
                                 component={LicenseScreen} />
                         </Stack.Navigator>
                     </NavigationContainer>
-            </GalleryContext.Provider>
+                </GalleryContext.Provider>
             </ConnectedDeviceContext.Provider>
         </DeviceListContext.Provider>
     );

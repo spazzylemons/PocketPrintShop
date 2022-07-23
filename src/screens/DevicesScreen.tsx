@@ -22,9 +22,6 @@ import styles from '../styles';
 import UsbSerial from '../UsbSerial';
 import { DeviceListContext, ConnectedDeviceContext } from '../Navigation';
 
-// TODO use ref
-let connectionInProgress = false;
-
 const DevicesScreen = () => {
     const { devices } = useContext(DeviceListContext);
     const { current, setCurrent } = useContext(ConnectedDeviceContext);
@@ -39,8 +36,6 @@ const DevicesScreen = () => {
     };
 
     const connect = async (device: UsbSerial.Device) => {
-        if (connectionInProgress) return;
-
         if (current?.id === device.id) {
             // if we're connected to this very device, we'll do a disconnect instead
             try {
@@ -60,13 +55,10 @@ const DevicesScreen = () => {
             }
 
             try {
-                connectionInProgress = true;
                 await UsbSerial.connect(device.id);
                 setCurrent(device);
             } catch (err) {
                 ToastAndroid.show('Connection failed: ' + err, ToastAndroid.LONG);
-            } finally {
-                connectionInProgress = false;
             }
         }
     };

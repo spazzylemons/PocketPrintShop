@@ -172,8 +172,9 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
         }
     }
 
+    // synchronized to avoid attempting multiple connections at the same time
     @ReactMethod
-    public void connect(int deviceId, Promise promise) {
+    public synchronized void connect(int deviceId, Promise promise) {
         try {
             UsbSerialDriver driver = getDriverById(deviceId);
             if (driver == null) {
@@ -212,11 +213,9 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
 
     @Override
     public void onNewData(byte[] data) {
-        synchronized (this) {
-            WritableMap map = Arguments.createMap();
-            map.putString("data", Base64.encodeToString(data, 0));
-            sendEvent(READ_EVENT, map);
-        }
+        WritableMap map = Arguments.createMap();
+        map.putString("data", Base64.encodeToString(data, 0));
+        sendEvent(READ_EVENT, map);
     }
 
     @Override

@@ -49,6 +49,10 @@ namespace UsbSerial {
         });
     }
 
+    export function onListUpdate(callback: () => void): EmitterSubscription {
+        return eventEmitter.addListener('usbSerialListUpdate', callback);
+    }
+
     export function getDeviceName(device: UsbSerial.Device) {
         return device.name ?? `[id ${device.id}]`;
     }

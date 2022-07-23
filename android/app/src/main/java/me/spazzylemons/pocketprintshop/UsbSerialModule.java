@@ -20,8 +20,10 @@ package me.spazzylemons.pocketprintshop;
 
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
@@ -51,12 +53,30 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
 
     private static final String DISCONNECT_EVENT = "usbSerialDisconnect";
     private static final String READ_EVENT = "usbSerialRead";
+    private static final String LIST_UPDATE_EVENT = "usbSerialListUpdate";
 
     private UsbSerialPort currentPort = null;
     private SerialInputOutputManager ioManager = null;
 
     UsbSerialModule(ReactApplicationContext reactContext) {
         super(reactContext);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        UsbSerialModule that = this;
+        reactContext.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+
+                // update the device list when devices are attached or detached
+                if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
+                    that.sendEvent(LIST_UPDATE_EVENT, null);
+                } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+                    that.sendEvent(LIST_UPDATE_EVENT, null);
+                }
+            }
+        }, filter);
     }
 
     @Override

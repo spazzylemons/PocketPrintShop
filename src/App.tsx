@@ -17,6 +17,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { ToastAndroid } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigatorTheme } from './styles';
@@ -58,14 +59,17 @@ const App = () => {
             endData();
         });
 
-        (async function checkDevices() {
-            try {
-                setDevices(await UsbSerial.listDevices());
-            } catch (err) {
-                console.error(err);
-            }
-            setTimeout(checkDevices, 1000);
-        })();
+        const updateDevices = () => {
+            UsbSerial.listDevices()
+                .then(setDevices)
+                .catch(err => {
+                    ToastAndroid.show('Failed to get device list: ' + err, ToastAndroid.LONG);
+                });
+        };
+
+        updateDevices();
+
+        UsbSerial.onListUpdate(updateDevices);
     }, []);
 
     return (

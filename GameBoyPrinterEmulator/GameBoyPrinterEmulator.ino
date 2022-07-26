@@ -25,35 +25,11 @@
  *
  */
 
-// See /WEBUSB.md for details
-#if USB_VERSION == 0x210
-#include <WebUSB.h>
-WebUSB WebUSBSerial(1, "herrzatacke.github.io/gb-printer-web/#/webusb");
-#define Serial WebUSBSerial
-#endif
-
-#define GBP_OUTPUT_RAW_PACKETS true // by default, packets are parsed. if enabled, output will change to raw data packets for parsing and decompressing later
-#define GBP_USE_PARSE_DECOMPRESSOR false // embedded decompressor can be enabled for use with parse mode but it requires fast hardware (SAMD21, SAMD51, ESP8266, ESP32)
-
 #include <stdint.h> // uint8_t
 #include <stddef.h> // size_t
 
 #include "gameboy_printer_protocol.h"
 #include "gbp_serial_io.h"
-
-#if GBP_OUTPUT_RAW_PACKETS
-  #define GBP_FEATURE_PACKET_CAPTURE_MODE
-#else
-  #define GBP_FEATURE_PARSE_PACKET_MODE
-  #if GBP_USE_PARSE_DECOMPRESSOR
-    #define GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-  #endif
-#endif
-
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-#include "gbp_pkt.h"
-#endif
-
 
 /* Gameboy Link Cable Mapping to Arduino Pin */
 // Note: Serial Clock Pin must be attached to an interrupt pin of the arduino
@@ -88,50 +64,14 @@ WebUSB WebUSBSerial(1, "herrzatacke.github.io/gb-printer-web/#/webusb");
 *******************************************************************************/
 
 // Dev Note: Gamboy camera sends data payload of 640 bytes usually
-
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-#define GBP_BUFFER_SIZE 400
-#else
 #define GBP_BUFFER_SIZE 650
-#endif
 
 /* Serial IO */
 // This circular buffer contains a stream of raw packets from the gameboy
 uint8_t gbp_serialIO_raw_buffer[GBP_BUFFER_SIZE] = {0};
 
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-/* Packet Buffer */
-gbp_pkt_t gbp_pktState = {GBP_REC_NONE, 0};
-uint8_t gbp_pktbuff[GBP_PKT_PAYLOAD_BUFF_SIZE_IN_BYTE] = {0};
-uint8_t gbp_pktbuffSize = 0;
-#ifdef GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-gbp_pkt_tileAcc_t tileBuff = {0};
-#endif
-#endif
-
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-inline void gbp_packet_capture_loop();
-#endif
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-inline void gbp_parse_packet_loop();
-#endif
-
-/*******************************************************************************
-  Utility Functions
-*******************************************************************************/
-
-const char *gbpCommand_toStr(int val)
-{
-  switch (val)
-  {
-    case GBP_COMMAND_INIT    : return "INIT";
-    case GBP_COMMAND_PRINT   : return "PRNT";
-    case GBP_COMMAND_DATA    : return "DATA";
-    case GBP_COMMAND_BREAK   : return "BREK";
-    case GBP_COMMAND_INQUIRY : return "INQY";
-    default: return "?";
-  }
-}
+static bool connected_to_app = false;
+static unsigned long last_heartbeat_ms = 0;
 
 /*******************************************************************************
   Interrupt Service Routine
@@ -143,6 +83,8 @@ void ICACHE_RAM_ATTR serialClock_ISR(void)
 void serialClock_ISR(void)
 #endif
 {
+  // if not connected to app, don't emulate the printer
+  if (!connected_to_app) return;
   // Serial Clock (1 = Rising Edge) (0 = Falling Edge); Master Output Slave Input (This device is slave)
 #ifdef GBP_FEATURE_USING_RISING_CLOCK_ONLY_ISR
   const bool txBit = gpb_serial_io_OnRising_ISR(digitalRead(GBP_SO_PIN));
@@ -187,23 +129,18 @@ void setup(void)
 #else
   attachInterrupt( digitalPinToInterrupt(GBP_SC_PIN), serialClock_ISR, CHANGE);  // attach interrupt handler
 #endif
-
-  /* Packet Parser */
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-  gbp_pkt_init(&gbp_pktState);
-#endif
 } // setup()
+
+static const char hexChars[] = "0123456789ABCDEF";
 
 void loop()
 {
-  static uint16_t sioWaterline = 0;
-
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-  gbp_packet_capture_loop();
-#endif
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-  gbp_parse_packet_loop();
-#endif
+  const size_t dataBuffCount = gbp_serial_io_dataBuff_getByteCount();
+  if (dataBuffCount) {
+    const uint8_t b = gbp_serial_io_dataBuff_getByte();
+    Serial.write(b);
+    Serial.flush();
+  }
 
   // Trigger Timeout and reset the printer if byte stopped being received.
   static uint32_t last_millis = 0;
@@ -214,30 +151,14 @@ void loop()
     if (gbp_serial_io_timeout_handler(elapsed_ms))
     {
       digitalWrite(LED_STATUS_PIN, LOW);
-
-#ifdef GBP_FEATURE_PARSE_PACKET_MODE
-      gbp_pkt_reset(&gbp_pktState);
-#ifdef GBP_FEATURE_PARSE_PACKET_USE_DECOMPRESSOR
-      tileBuff.count = 0;
-#endif
-#endif
     }
   }
   last_millis = curr_millis;
-} // loop()
-
-/******************************************************************************/
-
-static const char hexChars[] = "0123456789ABCDEF";
-
-#ifdef GBP_FEATURE_PACKET_CAPTURE_MODE
-inline void gbp_packet_capture_loop()
-{
-  const size_t dataBuffCount = gbp_serial_io_dataBuff_getByteCount();
-  if (dataBuffCount) {
-    const uint8_t b = gbp_serial_io_dataBuff_getByte();
-    Serial.write(b);
-    Serial.flush();
+  // handle heartbeat
+  if (Serial.available() and (Serial.read() == 0x95)) {
+    last_heartbeat_ms = curr_millis;
+    connected_to_app = true;
+  } else if (curr_millis - last_heartbeat_ms >= 200) {
+    connected_to_app =  false;
   }
-}
-#endif
+} // loop()

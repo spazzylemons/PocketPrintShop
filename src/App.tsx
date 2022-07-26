@@ -24,6 +24,7 @@ import { NavigatorTheme } from './styles';
 import parsePackets, { PrinterImage } from './parsePackets';
 import { DeviceListContext, ConnectedDeviceContext, GalleryContext } from './Navigation';
 import UsbSerial from './UsbSerial';
+import { Buffer } from 'buffer';
 
 // screens
 import DevicesScreen from './screens/DevicesScreen';
@@ -70,6 +71,22 @@ const App = () => {
 
         UsbSerial.onListUpdate(updateDevices);
     }, []);
+
+    useEffect(() => {
+        // heartbeat loop - allows emulator to detect if connected
+        const id = setInterval(async () => {
+            if (current !== null) {
+                // send a single byte to indicate connection
+                try {
+                    await UsbSerial.write(Buffer.from([0x95]), 80);
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+        }, 100);
+        // when the effect is updated, we need to clear the interval
+        return () => clearInterval(id);
+    }, [current]);
 
     return (
         <DeviceListContext.Provider value={deviceList}>

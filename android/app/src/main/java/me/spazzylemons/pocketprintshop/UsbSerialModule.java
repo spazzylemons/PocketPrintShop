@@ -238,6 +238,23 @@ public class UsbSerialModule extends ReactContextBaseJavaModule implements Seria
     }
 
     /**
+     * Send data to the connected device.
+     * @param base64Data The data to send, encoded as base64.
+     * @param timeout    The timeout before giving up. 0 means no timeout.
+     * @param promise    Resolves on success, rejects on failure.
+     */
+    @ReactMethod
+    public synchronized void write(String base64Data, int timeout, Promise promise) {
+        if (this.connection == null) return;
+        try {
+            this.connection.port.write(Base64.decode(base64Data, 0), 0);
+            promise.resolve(null);
+        } catch (Exception e) {
+            promise.reject(e);
+        }
+    }
+
+    /**
      * Stub method required to silence a warning from React.
      */
     @ReactMethod

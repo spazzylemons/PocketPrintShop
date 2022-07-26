@@ -56,6 +56,10 @@ namespace UsbSerial {
     export function getDeviceName(device: UsbSerial.Device) {
         return device.name ?? `[id ${device.id}]`;
     }
+
+    export function write(data: Buffer, timeout: number): Promise<null> {
+        return UsbSerialModule.write(data.toString('base64'), timeout);
+    }
 }
 
 export default UsbSerial;

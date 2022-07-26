@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ToastAndroid } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -44,14 +44,9 @@ const App = () => {
     const [images, setImages] = useState<PrinterImage[]>([]);
     const gallery = { images, setImages };
 
-    const addImage = useRef((image: PrinterImage) => {});
-    addImage.current = image => {
-        setImages(images.concat([image]));
-    };
-
     useEffect(() => {
         const endData = parsePackets(image => {
-            addImage.current(image);
+            setImages(images => images.concat([image]));
         });
 
         UsbSerial.onDisconnect(() => {

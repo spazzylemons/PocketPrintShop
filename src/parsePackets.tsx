@@ -223,8 +223,8 @@ async function processData(stream: AsyncStream): Promise<PrinterImage> {
         }
     }
 
-    // convert to bitmap
-    const pixels = new Uint32Array(new ArrayBuffer(IMAGE_WIDTH * height * 4));
+    // convert to bitmap at 2x resolution
+    const pixels = new Uint32Array(new ArrayBuffer(IMAGE_WIDTH * height * 16));
     let y = 0;
     for (const { payload, tiles } of imageParts) {
         const palette = payload[2];
@@ -235,9 +235,15 @@ async function processData(stream: AsyncStream): Promise<PrinterImage> {
                     let lo = tiles[i++];
                     let hi = tiles[i++];
                     for (let px = 0; px < 8; px++) {
+                        const index = (2 * IMAGE_WIDTH) * (2 * (y + py)) + (2 * (x + px));
                         const paletteIndex = (lo >> 7) | ((hi >> 6) & 2);
                         const paletteColor = 3 - ((palette >> (paletteIndex << 1)) & 3);
-                        pixels[IMAGE_WIDTH * (y + py) + x + px] = DEFAULT_PALETTE[paletteColor];
+                        const rgbaColor = DEFAULT_PALETTE[paletteColor];
+                        pixels[index]
+                            = pixels[index + 1]
+                            = pixels[index + (2 * IMAGE_WIDTH)]
+                            = pixels[index + (2 * IMAGE_WIDTH) + 1]
+                            = rgbaColor;
                         lo = (lo << 1) & 0xff;
                         hi = (hi << 1) & 0xff;
                     }
@@ -247,7 +253,7 @@ async function processData(stream: AsyncStream): Promise<PrinterImage> {
         }
     }
     // encode to PNG
-    const data = await PngEncoder.encode(pixels, IMAGE_WIDTH, height);
+    const data = await PngEncoder.encode(pixels, 2 * IMAGE_WIDTH, 2 * height);
     return new PrinterImage(data, height);
 }
 

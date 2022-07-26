@@ -22,6 +22,7 @@ import styles from '../styles';
 import UsbSerial from '../UsbSerial';
 import Button from '../Button';
 import Navigation, { ConnectedDeviceContext, GalleryContext } from '../Navigation';
+import Icon from 'react-native-vector-icons/Feather';
 
 const HomeScreen = ({ navigation }: { navigation: Navigation }) => {
     const { current } = useContext(ConnectedDeviceContext);
@@ -29,8 +30,12 @@ const HomeScreen = ({ navigation }: { navigation: Navigation }) => {
 
     return <View style={styles.main}>
         {current !== null
-            ? <Text style={styles.textLine}>Connected to {UsbSerial.getDeviceName(current)}</Text>
-            : <Text style={styles.textLine}>Not connected</Text>
+            ? <Text style={styles.textLine}>
+                <Icon name='check' size={16} /> Connected to {UsbSerial.getDeviceName(current)}
+            </Text>
+            : <Text style={styles.textLine}>
+                <Icon name='alert-circle' size={16} /> Not connected
+            </Text>
         }
         <Button
             onPress={() => navigation.navigate('Devices', {})}
@@ -45,7 +50,9 @@ const HomeScreen = ({ navigation }: { navigation: Navigation }) => {
                 </View>
             )}/>
         <Pressable style={{ position: 'absolute', bottom: 0 }} onPress={() => navigation.navigate('License', {})}>
-            <Text style={styles.textLine}>License</Text>
+            <Text style={[styles.textLine, { textShadowRadius: 2 }]}>
+                <Icon name='file-text' size={16} /> License
+            </Text>
         </Pressable>
     </View>;
 };

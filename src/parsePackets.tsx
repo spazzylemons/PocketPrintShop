@@ -51,7 +51,10 @@ export class PrinterImage {
     }
 
     public render() {
-        return <Image source={{ uri: this.uri }} style={{ width: IMAGE_WIDTH, height: this.height }} />;
+        return <Image source={{ uri: this.uri }} style={{
+            width: IMAGE_WIDTH * 2,
+            height: this.height * 2,
+        }} />;
     }
 
     public download() {

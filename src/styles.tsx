@@ -87,6 +87,10 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
         fontSize: 8,
     },
+
+    photoIcon: {
+        padding: 16,
+    },
 });
 
 export default styles;

@@ -17,27 +17,38 @@
  */
 
 import React, { useContext } from 'react';
-import { View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import styles from '../styles';
-import Button from '../Button';
+import Icon from 'react-native-vector-icons/Feather';
 
 import Navigation, { GalleryContext, PhotoParams } from '../Navigation';
 
+const PhotoIcon = ({ name }: { name: string }) => (
+    <Icon name={name} size={32} color={'#fff'} />
+);
 
 const PhotoScreen = ({ navigation, route }: { navigation: Navigation, route: { params: PhotoParams } }) => {
     const { images, setImages } = useContext(GalleryContext);
     const image = route.params.image;
 
     return <View style={styles.main}>
-        <View style={styles.pictureFrame}>{image.render()}</View>
-        <Button onPress={() => image.download()} title='Download'/>
-        <Button onPress={() => image.share()} title='Share'/>
-        <Button
-            onPress={() => {
-                setImages(images.filter(i => i !== image));
-                navigation.goBack();
-            }}
-            title='Delete'/>
+        <ScrollView>
+            <View style={styles.pictureFrame}>{image.render()}</View>
+            <View style={{ flexDirection: 'row', alignSelf: 'center' }}>
+                <Pressable style={styles.photoIcon} onPress={image.download.bind(image)}>
+                    <PhotoIcon name='download' />
+                </Pressable>
+                <Pressable style={styles.photoIcon} onPress={image.share.bind(image)}>
+                    <PhotoIcon name='share' />
+                </Pressable>
+                <Pressable style={styles.photoIcon} onPress={() => {
+                    setImages(images.filter(i => i !== image));
+                    navigation.goBack();
+                }}>
+                    <PhotoIcon name='trash' />
+                </Pressable>
+            </View>
+        </ScrollView>
     </View>;
 };
 
